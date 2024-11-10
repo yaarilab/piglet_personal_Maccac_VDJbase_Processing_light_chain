@@ -43,7 +43,7 @@ params.Undocumented_Alleles.mut_range = "1:10"
 params.Undocumented_Alleles.pos_range = "1:330"
 params.Undocumented_Alleles.y_intercept = 0.125
 params.Undocumented_Alleles.alpha = 0.05
-params.Undocumented_Alleles.j_max = 0.3
+params.Undocumented_Alleles.j_max = 0.15
 params.Undocumented_Alleles.min_frac = 0.75
 
 
