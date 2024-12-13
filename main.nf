@@ -2330,14 +2330,89 @@ outfile = outname + ".tsv"
 """
 #!/usr/bin/env Rscript
 
+## functions
+# find the different position between sequences
+
+src <- 
+"#include <Rcpp.h>
+using namespace Rcpp;
+#include <iostream>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <unordered_set>
+
+// [[Rcpp::export]]
+
+int allele_diff(std::vector<std::string> germs) {
+    std::vector<std::vector<char>> germs_m;
+    for (const std::string& germ : germs) {
+        germs_m.push_back(std::vector<char>(germ.begin(), germ.end()));
+    }
+
+    int max_length = 0;
+    for (const auto& germ : germs_m) {
+        max_length = std::max(max_length, static_cast<int>(germ.size()));
+    }
+
+    for (auto& germ : germs_m) {
+        germ.resize(max_length, '.'); // Pad with '.' to make all germs equal length
+    }
+
+    auto setdiff_mat = [](const std::vector<char>& x) -> int {
+        std::unordered_set<char> unique_chars(x.begin(), x.end());
+        std::unordered_set<char> filter_chars = { '.', 'N', '-' };
+        int diff_count = 0;
+        for (const char& c : unique_chars) {
+            if (filter_chars.find(c) == filter_chars.end()) {
+                diff_count++;
+            }
+        }
+        return diff_count;
+    };
+
+    std::vector<int> idx;
+    for (int i = 0; i < max_length; i++) {
+        std::vector<char> column_chars;
+        for (const auto& germ : germs_m) {
+            column_chars.push_back(germ[i]);
+        }
+        int diff_count = setdiff_mat(column_chars);
+        if (diff_count > 1) {
+            idx.push_back(i);
+        }
+    }
+
+    return idx.size();
+}"
+
+## libraries
+require(dplyr)
+library(Rcpp)
+library(ggplot2)
+sourceCpp(code = src)
 
 library(shazam)
 require(dplyr)
 library(stringi)
 
 df <- readr::read_tsv("${airrFile}")
-df<-observedMutations(df,sequenceColumn="sequence_alignment",germlineColumn="germline_alignment_d_mask",regionDefinition=IMGT_V,combine=TRUE)
-df<-df[df[,"mu_count"] == 0, ]
+df[["mut"]] <- sapply(1:nrow(df), function(j) {
+  # Get the end index
+  end_idx <- df[['v_alignment_end']][j]
+  
+  # Subset the alignments based on the end index
+  x <- c(substr(df[['sequence_alignment']][j], 1, end_idx),
+         substr(df[['germline_alignment_d_mask']][j], 1, end_idx))
+  
+  # Calculate the allele difference
+  allele_diff(x)
+})
+
+df<-df[df[,"mut"] == 0, ]
+
+#df<-observedMutations(df,sequenceColumn="sequence_alignment",germlineColumn="germline_alignment_d_mask",regionDefinition=IMGT_V,combine=TRUE)
+#df<-df[df[,"mu_count"] == 0, ]
 df <- df %>% filter(!grepl(",", v_call))
 df[["v_start"]] <- stringi::stri_locate_first(df[['sequence_alignment']], regex = "[ATCG]")[,1]
 df<-df[df[,"v_start"]==1,]
@@ -2449,58 +2524,6 @@ select_columns <- if ("${chain}" == "IGH") c("sequence_id", "v_call", "d_call", 
 setDT(data)
 data_selected <- data[, .SD, .SDcols = select_columns]
 write.table(data_selected, sep = "\t", file = paste0("${outname_selected}", ".tsv"), row.names = FALSE)
-"""
-
-}
-
-
-process add_full_seq_col {
-
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*_with_full_seq.tsv$/) "rearrangements/$filename"}
-input:
- set val(name), file(airrSeq) from g_94_fastaFile_g_125
- set val(name1),file(airrFile) from g_113_outputFileTSV0_g_125
-
-output:
- set val(name1),file("*_with_full_seq.tsv")  into g_125_outputFileTSV00
-
-script:
-
-outname = airrFile.toString() - '.tsv' +"_with_full_seq"
-
-
-"""
-#!/usr/bin/env Rscript 
-
-
-# Load necessary libraries
-library(Biostrings)
-library(dplyr)
-
-# Read the FASTA file
-fasta_seqs <- readDNAStringSet("${airrSeq}")
-
-# Convert FASTA data to a dataframe with sequence_id and full_seq
-fasta_df <- data.frame(
-  sequence_id = names(fasta_seqs),
-  full_seq = as.character(fasta_seqs)
-)
-
-fasta_df[["sequence_id"]] <- sapply(strsplit(fasta_df[["sequence_id"]], "|", fixed = TRUE), `[`, 1)
-
-# Read the TSV file
-tsv_data <- data.table::fread("${airrFile}", data.table = F)
-
-
-
-# Merge the TSV file with FASTA data on sequence_id
-merged_data <- tsv_data %>%
-  left_join(fasta_df, by = "sequence_id")
-
-# Save the updated TSV with the full_seq column
-write.table(merged_data, sep = "\t", file = paste0("${outname}", ".tsv"), row.names = FALSE)
-
-
 """
 
 }
@@ -3759,6 +3782,58 @@ input:
 
 output:
  set val(name1),file("*_with_full_seq.tsv")  into g_136_outputFileTSV00
+
+script:
+
+outname = airrFile.toString() - '.tsv' +"_with_full_seq"
+
+
+"""
+#!/usr/bin/env Rscript 
+
+
+# Load necessary libraries
+library(Biostrings)
+library(dplyr)
+
+# Read the FASTA file
+fasta_seqs <- readDNAStringSet("${airrSeq}")
+
+# Convert FASTA data to a dataframe with sequence_id and full_seq
+fasta_df <- data.frame(
+  sequence_id = names(fasta_seqs),
+  full_seq = as.character(fasta_seqs)
+)
+
+fasta_df[["sequence_id"]] <- sapply(strsplit(fasta_df[["sequence_id"]], "|", fixed = TRUE), `[`, 1)
+
+# Read the TSV file
+tsv_data <- data.table::fread("${airrFile}", data.table = F)
+
+
+
+# Merge the TSV file with FASTA data on sequence_id
+merged_data <- tsv_data %>%
+  left_join(fasta_df, by = "sequence_id")
+
+# Save the updated TSV with the full_seq column
+write.table(merged_data, sep = "\t", file = paste0("${outname}", ".tsv"), row.names = FALSE)
+
+
+"""
+
+}
+
+
+process add_full_seq_col {
+
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*_with_full_seq.tsv$/) "rearrangements/$filename"}
+input:
+ set val(name), file(airrSeq) from g_94_fastaFile_g_125
+ set val(name1),file(airrFile) from g_113_outputFileTSV0_g_125
+
+output:
+ set val(name1),file("*_with_full_seq.tsv")  into g_125_outputFileTSV00
 
 script:
 
