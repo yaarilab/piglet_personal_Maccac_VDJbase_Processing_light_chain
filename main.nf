@@ -2397,9 +2397,10 @@ require(dplyr)
 library(stringi)
 
 df <- readr::read_tsv("${airrFile}")
+
 df[["mut"]] <- sapply(1:nrow(df), function(j) {
   # Get the end index
-  end_idx <- df[['v_alignment_end']][j]
+  end_idx <- df[['v_germline_end']][j]
   
   # Subset the alignments based on the end index
   x <- c(substr(df[['sequence_alignment']][j], 1, end_idx),
