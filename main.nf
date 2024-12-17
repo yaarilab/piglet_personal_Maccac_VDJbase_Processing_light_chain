@@ -775,7 +775,7 @@ input:
  set val(name),file(airrFile) from g0_12_outputFileTSV0_g0_19
 
 output:
- set val(name), file("${outfile}"+"passed.tsv") optional true  into g0_19_outputFileTSV0_g0_27, g0_19_outputFileTSV0_g0_52, g0_19_outputFileTSV0_g_68, g0_19_outputFileTSV0_g_80, g0_19_outputFileTSV0_g_8, g0_19_outputFileTSV0_g_101
+ set val(name), file("${outfile}"+"passed.tsv") optional true  into g0_19_outputFileTSV0_g0_27, g0_19_outputFileTSV0_g0_52, g0_19_outputFileTSV0_g_8, g0_19_outputFileTSV0_g_68, g0_19_outputFileTSV0_g_80, g0_19_outputFileTSV0_g_101
  set val(name), file("${outfile}"+"failed*") optional true  into g0_19_outputFileTSV1_g0_27, g0_19_outputFileTSV1_g0_52
 
 script:
@@ -1067,10 +1067,9 @@ suppressMessages(require(dplyr))
 
 ## check for repeated nucliotide in sequece. get the novel allele and the germline sequence.
 Repeated_Read <- function(x, seq) {
-  NT <- stringr::as.numeric(str_extract(x, "^[0-9]+"))#as.numeric(gsub('([0-9]+).*', '\\1', x))
+  NT <- as.numeric(gsub('([0-9]+).*', '\\1', x))
   SNP <- gsub('.*>', '', x)
-  OR_SNP <- stringr::str_extract(x, "^[0-9]+([[:alpha:]]*)") %>%
-          stringr::str_replace("^[0-9]+", "")#gsub('[0-9]+([[:alpha:]]*).*', '\\1', x)
+  OR_SNP <- gsub('[0-9]+([[:alpha:]]*).*', '\\1', x)
   seq <- c(substr(seq, (NT), (NT + 3)),
            substr(seq, (NT - 1), (NT + 2)),
            substr(seq, (NT - 2), (NT + 1)),
@@ -1300,26 +1299,6 @@ with open(file_path, 'w'):
 }
 
 
-process make_igblast_annotate_j_second_alignment {
-
-input:
- set val(db_name), file(germlineFile) from g_102_germlineFastaFile0_g_103
-
-output:
- file aux_file  into g_103_outputFileTxt0_g11_9
-
-script:
-
-
-
-aux_file = "J.aux"
-
-"""
-annotate_j ${germlineFile} ${aux_file}
-"""
-}
-
-
 process Second_Alignment_J_MakeBlastDb {
 
 input:
@@ -1341,6 +1320,129 @@ if(germlineFile.getName().endsWith("fasta")){
 	echo something if off
 	"""
 }
+
+}
+
+
+process make_igblast_annotate_j_second_alignment {
+
+input:
+ set val(db_name), file(germlineFile) from g_102_germlineFastaFile0_g_103
+
+output:
+ file aux_file  into g_103_outputFileTxt0_g11_9
+
+script:
+
+
+
+aux_file = "J.aux"
+
+"""
+annotate_j ${germlineFile} ${aux_file}
+"""
+}
+
+
+process airrseq_to_fasta {
+
+input:
+ set val(name), file(airrseq_data) from g0_19_outputFileTSV0_g_80
+
+output:
+ set val(name), file(outfile)  into g_80_germlineFastaFile0_g11_12, g_80_germlineFastaFile0_g11_9, g_80_germlineFastaFile0_g131_12, g_80_germlineFastaFile0_g131_9
+
+script:
+
+outfile = name+"_collapsed_seq.fasta"
+
+"""
+#!/usr/bin/env Rscript
+
+data <- data.table::fread("${airrseq_data}", stringsAsFactors = F, data.table = F)
+
+data_columns <- names(data)
+
+# take extra columns after cdr3
+
+idx_cdr <- which(data_columns=="cdr3")+1
+
+add_columns <- data_columns[idx_cdr:length(data_columns)]
+
+unique_information <- unique(c("sequence_id", "duplicate_count", "consensus_count", "c_call", add_columns))
+
+unique_information <- unique_information[unique_information %in% data_columns]
+
+seqs <- data[["sequence"]]
+
+seqs_name <-
+  sapply(1:nrow(data), function(x) {
+    paste0(unique_information,
+           rep('=', length(unique_information)),
+           data[x, unique_information],
+           collapse = '|')
+  })
+seqs_name <- gsub('sequence_id=', '', seqs_name, fixed = T)
+
+tigger::writeFasta(setNames(seqs, seqs_name), "${outfile}")
+
+"""
+}
+
+
+process ogrdbstats_report_first_alignment {
+
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*pdf$/) "ogrdbstats_first_alignment/$filename"}
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*csv$/) "ogrdbstats_first_alignment/$filename"}
+input:
+ set val(name),file(airrFile) from g0_19_outputFileTSV0_g_68
+ set val(name1), file(germline_file) from g0_12_germlineFastaFile1_g_68
+ set val(name2), file(v_germline_file) from g_92_germlineFastaFile0_g_68
+
+output:
+ file "*pdf"  into g_68_outputFilePdf00
+ file "*csv"  into g_68_outputFileCSV11
+
+script:
+
+// general params
+chain = params.ogrdbstats_report_first_alignment.chain
+outname = airrFile.name.toString().substring(0, airrFile.name.toString().indexOf("_db-pass"))
+
+"""
+
+germline_file_path=\$(realpath ${germline_file})
+
+novel=""
+
+if grep -q "_[A-Z][0-9]" ${v_germline_file}; then
+	awk '/^>/{f=0} \$0 ~ /_[A-Z][0-9]/ {f=1} f' ${v_germline_file} > novel_sequences.fasta
+	novel=\$(realpath novel_sequences.fasta)
+	diff \$germline_file_path \$novel | grep '^<' | sed 's/^< //' > personal_germline.fasta
+	germline_file_path=\$(realpath personal_germline.fasta)
+	novel="--inf_file \$novel"
+fi
+
+IFS='\t' read -a var < ${airrFile}
+
+airrfile=${airrFile}
+
+if [[ ! "\${var[*]}" =~ "v_call_genotyped" ]]; then
+    awk -F'\t' '{col=\$5;gsub("call", "call_genotyped", col); print \$0 "\t" col}' ${airrFile} > ${outname}_genotyped.tsv
+    airrfile=${outname}_genotyped.tsv
+fi
+
+airrFile_path=\$(realpath \$airrfile)
+
+
+run_ogrdbstats \
+	\$germline_file_path \
+	"Homosapiens" \
+	\$airrFile_path \
+	${chain} \
+	\$novel 
+
+"""
 
 }
 
@@ -1391,10 +1493,9 @@ suppressMessages(require(dplyr))
 
 ## check for repeated nucliotide in sequece. get the novel allele and the germline sequence.
 Repeated_Read <- function(x, seq) {
-  NT <- as.numeric(stringr::str_extract(x, "^[0-9]+"))#as.numeric(gsub('([0-9]+).*', '', x))
+  NT <- as.numeric(gsub('([0-9]+).*', '\\1', x))
   SNP <- gsub('.*>', '', x)
-  OR_SNP <- stringr::str_extract(x, "^[0-9]+([[:alpha:]]*)") %>%
-          stringr::str_replace("^[0-9]+", "") #gsub('[0-9]+([[:alpha:]]*).*', '', x)
+  OR_SNP <- gsub('[0-9]+([[:alpha:]]*).*', '\\1', x)
   seq <- c(substr(seq, (NT), (NT + 3)),
            substr(seq, (NT - 1), (NT + 2)),
            substr(seq, (NT - 2), (NT + 1)),
@@ -1619,31 +1720,6 @@ with open(file_path, 'w'):
 }
 
 
-process make_igblast_ndm_second_alignment {
-
-input:
- set val(db_name), file(germlineFile) from g_70_germlineFastaFile0_g_78
-
-output:
- file ndm_file  into g_78_outputFileTxt0_g11_9
-
-script:
-
-ndm_chain = params.make_igblast_ndm_second_alignment.ndm_chain
-
-chains = [IGH: 'VH', IGK: 'VK', IGL: 'VL', TRA: 'VA', TRB: 'VB', TRD: 'VD', TRG: 'VG']
-
-chain = chains[ndm_chain]
-
-ndm_file = db_name+".ndm"
-
-"""
-make_igblast_ndm ${germlineFile} ${chain} ${ndm_file}
-"""
-
-}
-
-
 process Second_Alignment_V_MakeBlastDb {
 
 input:
@@ -1669,49 +1745,28 @@ if(germlineFile.getName().endsWith("fasta")){
 }
 
 
-process airrseq_to_fasta {
+process make_igblast_ndm_second_alignment {
 
 input:
- set val(name), file(airrseq_data) from g0_19_outputFileTSV0_g_80
+ set val(db_name), file(germlineFile) from g_70_germlineFastaFile0_g_78
 
 output:
- set val(name), file(outfile)  into g_80_germlineFastaFile0_g11_12, g_80_germlineFastaFile0_g11_9, g_80_germlineFastaFile0_g131_12, g_80_germlineFastaFile0_g131_9
+ file ndm_file  into g_78_outputFileTxt0_g11_9
 
 script:
 
-outfile = name+"_collapsed_seq.fasta"
+ndm_chain = params.make_igblast_ndm_second_alignment.ndm_chain
+
+chains = [IGH: 'VH', IGK: 'VK', IGL: 'VL', TRA: 'VA', TRB: 'VB', TRD: 'VD', TRG: 'VG']
+
+chain = chains[ndm_chain]
+
+ndm_file = db_name+".ndm"
 
 """
-#!/usr/bin/env Rscript
-
-data <- data.table::fread("${airrseq_data}", stringsAsFactors = F, data.table = F)
-
-data_columns <- names(data)
-
-# take extra columns after cdr3
-
-idx_cdr <- which(data_columns=="cdr3")+1
-
-add_columns <- data_columns[idx_cdr:length(data_columns)]
-
-unique_information <- unique(c("sequence_id", "duplicate_count", "consensus_count", "c_call", add_columns))
-
-unique_information <- unique_information[unique_information %in% data_columns]
-
-seqs <- data[["sequence"]]
-
-seqs_name <-
-  sapply(1:nrow(data), function(x) {
-    paste0(unique_information,
-           rep('=', length(unique_information)),
-           data[x, unique_information],
-           collapse = '|')
-  })
-seqs_name <- gsub('sequence_id=', '', seqs_name, fixed = T)
-
-tigger::writeFasta(setNames(seqs, seqs_name), "${outfile}")
-
+make_igblast_ndm ${germlineFile} ${chain} ${ndm_file}
 """
+
 }
 
 
@@ -3132,58 +3187,6 @@ make_igblast_ndm ${germlineFile} ${chain} ${ndm_file}
 }
 
 
-process add_full_seq_col {
-
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*_with_full_seq.tsv$/) "rearrangements/$filename"}
-input:
- set val(name), file(airrSeq) from g_94_fastaFile_g_125
- set val(name1),file(airrFile) from g_113_outputFileTSV0_g_125
-
-output:
- set val(name1),file("*_with_full_seq.tsv")  into g_125_outputFileTSV00
-
-script:
-
-outname = airrFile.toString() - '.tsv' +"_with_full_seq"
-
-
-"""
-#!/usr/bin/env Rscript 
-
-
-# Load necessary libraries
-library(Biostrings)
-library(dplyr)
-
-# Read the FASTA file
-fasta_seqs <- readDNAStringSet("${airrSeq}")
-
-# Convert FASTA data to a dataframe with sequence_id and full_seq
-fasta_df <- data.frame(
-  sequence_id = names(fasta_seqs),
-  full_seq = as.character(fasta_seqs)
-)
-
-fasta_df[["sequence_id"]] <- sapply(strsplit(fasta_df[["sequence_id"]], "|", fixed = TRUE), `[`, 1)
-
-# Read the TSV file
-tsv_data <- data.table::fread("${airrFile}", data.table = F)
-
-
-
-# Merge the TSV file with FASTA data on sequence_id
-merged_data <- tsv_data %>%
-  left_join(fasta_df, by = "sequence_id")
-
-# Save the updated TSV with the full_seq column
-write.table(merged_data, sep = "\t", file = paste0("${outname}", ".tsv"), row.names = FALSE)
-
-
-"""
-
-}
-
-
 process third_Alignment_IgBlastn {
 
 input:
@@ -3823,57 +3826,52 @@ write.table(merged_data, sep = "\t", file = paste0("${outname}", ".tsv"), row.na
 }
 
 
-process ogrdbstats_report_first_alignment {
+process add_full_seq_col {
 
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*pdf$/) "ogrdbstats_first_alignment/$filename"}
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*csv$/) "ogrdbstats_first_alignment/$filename"}
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*_with_full_seq.tsv$/) "rearrangements/$filename"}
 input:
- set val(name),file(airrFile) from g0_19_outputFileTSV0_g_68
- set val(name1), file(germline_file) from g0_12_germlineFastaFile1_g_68
- set val(name2), file(v_germline_file) from g_92_germlineFastaFile0_g_68
+ set val(name), file(airrSeq) from g_94_fastaFile_g_125
+ set val(name1),file(airrFile) from g_113_outputFileTSV0_g_125
 
 output:
- file "*pdf"  into g_68_outputFilePdf00
- file "*csv"  into g_68_outputFileCSV11
+ set val(name1),file("*_with_full_seq.tsv")  into g_125_outputFileTSV00
 
 script:
 
-// general params
-chain = params.ogrdbstats_report_first_alignment.chain
-outname = airrFile.name.toString().substring(0, airrFile.name.toString().indexOf("_db-pass"))
+outname = airrFile.toString() - '.tsv' +"_with_full_seq"
+
 
 """
-
-germline_file_path=\$(realpath ${germline_file})
-
-novel=""
-
-if grep -q "_[A-Z][0-9]" ${v_germline_file}; then
-	awk '/^>/{f=0} \$0 ~ /_[A-Z][0-9]/ {f=1} f' ${v_germline_file} > novel_sequences.fasta
-	novel=\$(realpath novel_sequences.fasta)
-	diff \$germline_file_path \$novel | grep '^<' | sed 's/^< //' > personal_germline.fasta
-	germline_file_path=\$(realpath personal_germline.fasta)
-	novel="--inf_file \$novel"
-fi
-
-IFS='\t' read -a var < ${airrFile}
-
-airrfile=${airrFile}
-
-if [[ ! "\${var[*]}" =~ "v_call_genotyped" ]]; then
-    awk -F'\t' '{col=\$5;gsub("call", "call_genotyped", col); print \$0 "\t" col}' ${airrFile} > ${outname}_genotyped.tsv
-    airrfile=${outname}_genotyped.tsv
-fi
-
-airrFile_path=\$(realpath \$airrfile)
+#!/usr/bin/env Rscript 
 
 
-run_ogrdbstats \
-	\$germline_file_path \
-	"Homosapiens" \
-	\$airrFile_path \
-	${chain} \
-	\$novel 
+# Load necessary libraries
+library(Biostrings)
+library(dplyr)
+
+# Read the FASTA file
+fasta_seqs <- readDNAStringSet("${airrSeq}")
+
+# Convert FASTA data to a dataframe with sequence_id and full_seq
+fasta_df <- data.frame(
+  sequence_id = names(fasta_seqs),
+  full_seq = as.character(fasta_seqs)
+)
+
+fasta_df[["sequence_id"]] <- sapply(strsplit(fasta_df[["sequence_id"]], "|", fixed = TRUE), `[`, 1)
+
+# Read the TSV file
+tsv_data <- data.table::fread("${airrFile}", data.table = F)
+
+
+
+# Merge the TSV file with FASTA data on sequence_id
+merged_data <- tsv_data %>%
+  left_join(fasta_df, by = "sequence_id")
+
+# Save the updated TSV with the full_seq column
+write.table(merged_data, sep = "\t", file = paste0("${outname}", ".tsv"), row.names = FALSE)
+
 
 """
 
