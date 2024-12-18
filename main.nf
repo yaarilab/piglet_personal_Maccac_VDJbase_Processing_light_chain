@@ -43,7 +43,7 @@ params.Undocumented_Alleles.mut_range = "1:10"
 params.Undocumented_Alleles.pos_range = "1:330"
 params.Undocumented_Alleles.y_intercept = 0.125
 params.Undocumented_Alleles.alpha = 0.05
-params.Undocumented_Alleles.j_max = 0.3
+params.Undocumented_Alleles.j_max = 0.15
 params.Undocumented_Alleles.min_frac = 0.75
 
 
@@ -142,7 +142,6 @@ if (!params.d_germline){params.d_germline = ""}
 if (!params.j_germline){params.j_germline = ""} 
 if (!params.airr_seq){params.airr_seq = ""} 
 if (!params.v_optimized_thresholds){params.v_optimized_thresholds = ""} 
-if (!params.d_optimized_thresholds){params.d_optimized_thresholds = ""} 
 if (!params.j_optimized_thresholds){params.j_optimized_thresholds = ""} 
 // Stage empty file to be used as an optional input where required
 ch_empty_file_1 = file("$baseDir/.emptyfiles/NO_FILE_1", hidden:true)
@@ -771,6 +770,7 @@ if(igblastOut.getName().endsWith(".out")){
 
 process First_Alignment_Collapse_AIRRseq {
 
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /${outfile}+passed.tsv$/) "rearrangements/$filename"}
 input:
  set val(name),file(airrFile) from g0_12_outputFileTSV0_g0_19
 
@@ -1472,19 +1472,19 @@ if (class(novel) != 'try-error') {
 	print(novel)
 	
 	if (nrow(novel) != 0) {
-		SNP_XXXX <- unlist(sapply(1:nrow(novel), function(i) {
-		  subs <- strsplit(novel[['nt_substitutions']][i], ',')[[1]]
-		  RR <-
-		    unlist(sapply(subs,
-		           Repeated_Read,
-		           seq = novel[['germline_imgt']][i],
-		           simplify = F))
-		  RR <- RR[!is.na(RR)]
+		# SNP_XXXX <- unlist(sapply(1:nrow(novel), function(i) {
+		#   subs <- strsplit(novel[['nt_substitutions']][i], ',')[[1]]
+		#   RR <-
+		#     unlist(sapply(subs,
+		#           Repeated_Read,
+		#           seq = novel[['germline_imgt']][i],
+		#           simplify = F))
+		#   RR <- RR[!is.na(RR)]
 		  
-		  length(RR) != 0
-		}))
+		#   length(RR) != 0
+		# }))
 		
-		novel <- novel[!SNP_XXXX, ]
+		# novel <- novel[!SNP_XXXX, ]
 		
 		# remove duplicated novel alleles
 		bool <- !duplicated(novel[['polymorphism_call']])
