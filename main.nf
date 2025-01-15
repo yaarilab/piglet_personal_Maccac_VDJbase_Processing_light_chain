@@ -134,7 +134,7 @@ params.third_Alignment_MakeDb.asisid = "false"
 params.third_Alignment_MakeDb.asiscalls = "false"
 params.third_Alignment_MakeDb.inferjunction = "false"
 params.third_Alignment_MakeDb.partial = "false"
-params.third_Alignment_MakeDb.name_alignment = "_third_Alignment"
+params.third_Alignment_MakeDb.name_alignment = "Finale"
 
 
 if (!params.v_germline_file){params.v_germline_file = ""} 
@@ -2381,7 +2381,7 @@ input:
  file j_change from g_90_outputFileCSV1_g_113
 
 output:
- set val(name),file("*_change_name.tsv")  into g_113_outputFileTSV0_g_125
+ set val(name),file("*_change_name.tsv")  into g_113_outputFileTSV0_g_125, g_113_outputFileTSV0_g_143
  set val(name),file("*_to_piglet.tsv")  into g_113_outputFileTSV1_g_114, g_113_outputFileTSV1_g_115
 
 script:
@@ -2486,7 +2486,7 @@ input:
  set val(name4), file(germline_file) from g_101_germlineFastaFile1_g_115
 
 output:
- set val(name1),file("*_genotype_report.tsv")  into g_115_outputFileTSV00
+ set val(name1),file("*_genotype_report.tsv")  into g_115_outputFileTSV0_g_143
  set val(name1),file("*_personal_reference.fasta")  into g_115_germlineFastaFile1_g_129
 
 script:
@@ -2624,7 +2624,28 @@ genotypes[, ref := reference[allele], by = "allele"]
 setDT(genotypes)
 genotypes[, in_genomic := allele %in% digger_germline[["allele"]]]
 
-write.table(genotypes, file = paste0("${call}","_genotype_report.tsv"), row.names = F, sep = "\t")
+
+df_transformed <- genotypes %>%
+  group_by(gene) %>%
+  mutate(
+    allele_post_star = sub(".*[*]", "", allele),  # Extract part after '*'
+    genotyped_allele_temp = ifelse(z_score > 0, allele_post_star, NA)
+  ) %>%
+  summarise(
+    alleles = paste(allele_post_star, collapse = ","),
+    sample = paste(unique(sample), collapse = ","),
+    threshold = paste(threshold, collapse = ","),
+    counts = paste(count, collapse = ","),
+    total = sum(count),
+    note = "",
+    sum_count = paste(sum_count, collapse = ","),
+    z_score = paste(z_score, collapse = ","),
+    ref = paste(ref, collapse = ","),
+    in_genomic = paste(in_genomic, collapse = ","),
+    genotyped_alleles = paste(na.omit(genotyped_allele_temp), collapse = ",")
+  ) %>% select(-sum_count)
+
+write.table(df_transformed, file = paste0("${call}","_genotype_report.tsv"), row.names = F, sep = "\t")
 
 
 genotypes <- genotypes[genotypes[["z_score"]]>=0,]
@@ -2814,8 +2835,8 @@ input:
  set val(name4), file(germline_file) from g_8_germlineFastaFile1_g_114
 
 output:
- set val(name1),file("*_genotype_report.tsv")  into g_114_outputFileTSV00
- set val(name1),file("*_personal_reference.fasta")  into g_114_germlineFastaFile1_g_130
+ set val(name1),file("*_genotype_report.tsv")  into g_114_outputFileTSV0_g_143
+ set val(name1),file("*_personal_reference.fasta")  into g_114_germlineFastaFile1_g_130, g_114_germlineFastaFile1_g_145
 
 script:
 call = params.genotype_piglet_v_call.call
@@ -2952,7 +2973,28 @@ genotypes[, ref := reference[allele], by = "allele"]
 setDT(genotypes)
 genotypes[, in_genomic := allele %in% digger_germline[["allele"]]]
 
-write.table(genotypes, file = paste0("${call}","_genotype_report.tsv"), row.names = F, sep = "\t")
+
+df_transformed <- genotypes %>%
+  group_by(gene) %>%
+  mutate(
+    allele_post_star = sub(".*[*]", "", allele),  # Extract part after '*'
+    genotyped_allele_temp = ifelse(z_score > 0, allele_post_star, NA)
+  ) %>%
+  summarise(
+    alleles = paste(allele_post_star, collapse = ","),
+    sample = paste(unique(sample), collapse = ","),
+    threshold = paste(threshold, collapse = ","),
+    counts = paste(count, collapse = ","),
+    total = sum(count),
+    note = "",
+    sum_count = paste(sum_count, collapse = ","),
+    z_score = paste(z_score, collapse = ","),
+    ref = paste(ref, collapse = ","),
+    in_genomic = paste(in_genomic, collapse = ","),
+    genotyped_alleles = paste(na.omit(genotyped_allele_temp), collapse = ",")
+  ) %>% select(-sum_count)
+
+write.table(df_transformed, file = paste0("${call}","_genotype_report.tsv"), row.names = F, sep = "\t")
 
 
 genotypes <- genotypes[genotypes[["z_score"]]>=0,]
@@ -3244,7 +3286,7 @@ input:
 
 output:
  set val(name_igblast),file("*_db-pass.tsv") optional true  into g131_12_outputFileTSV0_g131_43, g131_12_outputFileTSV0_g131_47, g131_12_outputFileTSV0_g_134
- set val("reference_set"), file("${reference_set}") optional true  into g131_12_germlineFastaFile11
+ set val("reference_set"), file("${reference_set}") optional true  into g131_12_germlineFastaFile1_g_145
  set val(name_igblast),file("*_db-fail.tsv") optional true  into g131_12_outputFileTSV22
 
 script:
@@ -3671,13 +3713,14 @@ g_129_outputFileCSV1_g_134= g_129_outputFileCSV1_g_134.ifEmpty([""])
 
 process changes_names_for_piglet_1 {
 
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*_change_name.tsv$/) "rearrangements/$filename"}
 input:
  set val(name),file(airrFile) from g131_12_outputFileTSV0_g_134
  file v_change from g_130_csvFile1_g_134
  file j_change from g_129_outputFileCSV1_g_134
 
 output:
- set val(name),file("*_change_name.tsv")  into g_134_outputFileTSV0_g_136
+ set val(name),file("*_change_name.tsv")  into g_134_outputFileTSV0_g_136, g_134_outputFileTSV0_g_143, g_134_outputFileTSV0_g_145
  set val(name),file("*_to_piglet.tsv")  into g_134_outputFileTSV11
 
 script:
@@ -3768,6 +3811,205 @@ data_selected <- data[, .SD, .SDcols = select_columns]
 write.table(data_selected, sep = "\t", file = paste0("${outname_selected}", ".tsv"), row.names = FALSE)
 """
 
+}
+
+
+process ogrdbstats_report {
+
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*pdf$/) "ogrdbstats_third_alignment/$filename"}
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*csv$/) "ogrdbstats_third_alignment/$filename"}
+input:
+ set val(name),file(airrFile) from g_134_outputFileTSV0_g_145
+ set val(name1), file(germline_file) from g131_12_germlineFastaFile1_g_145
+ set val(name2), file(v_germline_file) from g_114_germlineFastaFile1_g_145
+
+output:
+ file "*pdf"  into g_145_outputFilePdf00
+ file "*csv"  into g_145_outputFileCSV11
+
+script:
+
+// general params
+chain = params.ogrdbstats_report.chain
+outname = airrFile.name.toString().substring(0, airrFile.name.toString().indexOf("_db-pass"))
+
+"""
+
+germline_file_path=\$(realpath ${germline_file})
+
+novel=""
+
+if grep -q "_[A-Z][0-9]" ${v_germline_file}; then
+	awk '/^>/{f=0} \$0 ~ /_[A-Z][0-9]/ {f=1} f' ${v_germline_file} > novel_sequences.fasta
+	novel=\$(realpath novel_sequences.fasta)
+	diff \$germline_file_path \$novel | grep '^<' | sed 's/^< //' > personal_germline.fasta
+	germline_file_path=\$(realpath personal_germline.fasta)
+	novel="--inf_file \$novel"
+fi
+
+IFS='\t' read -a var < ${airrFile}
+
+airrfile=${airrFile}
+
+if [[ ! "\${var[*]}" =~ "v_call_genotyped" ]]; then
+    awk -F'\t' '{col=\$5;gsub("call", "call_genotyped", col); print \$0 "\t" col}' ${airrFile} > ${outname}_genotyped.tsv
+    airrfile=${outname}_genotyped.tsv
+fi
+
+airrFile_path=\$(realpath \$airrfile)
+
+
+run_ogrdbstats \
+	\$germline_file_path \
+	"Homosapiens" \
+	\$airrFile_path \
+	${chain} \
+	\$novel 
+
+"""
+
+}
+
+def defaultIfInexistent(varName){
+    try{
+    	println binding.hasVariable(varName)
+        varName.toString()
+        println varName()
+        return varName
+    }catch(ex){
+        return "check"//file("$baseDir/.emptyfiles/NO_FILE_1", hidden:true)
+    }
+}
+
+def bindingVar(varName) {
+    def optVar = binding.hasVariable(varName)//binding.variables.get(varName)
+    println optVar
+    if(optVar) {
+    	println "pass"
+        println optVar
+        //will only run for global var
+    }
+    println "fail"
+    optVar
+}
+process VDJbase_genotype_report {
+
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /${outname}_genotype.tsv$/) "genotype_report/$filename"}
+input:
+ set val(name1),file(initial_run) from g_113_outputFileTSV0_g_143
+ set val(name2),file(personal_run) from g_134_outputFileTSV0_g_143
+ set val(name3),file(v_genotype) from g_114_outputFileTSV0_g_143
+ set val(name5),file(j_genotype) from g_115_outputFileTSV0_g_143
+
+output:
+ set val(outname),file("${outname}_genotype.tsv") optional true  into g_143_outputFileTSV00
+
+script:
+
+outname = initial_run.name.substring(0, initial_run.name.indexOf("_db-pass"))
+
+"""
+#!/usr/bin/env Rscript
+
+library(dplyr)
+library(data.table)
+library(alakazam)
+
+# the function get the alleles calls frequencies
+getFreq <- function(data, call = "v_call"){
+	# get the single assignment frequency of the alleles
+	table(grep(",", data[[call]][data[[call]]!=""], invert = T, value = T))
+}
+
+addFreqInfo <- function(tab, gene, alleles){
+	paste0(tab[paste0(gene, "*", unlist(strsplit(alleles, ',')))], collapse = ";")
+}
+
+## read selected data columns
+
+data_initial_run <- fread("${initial_run}", data.table = FALSE, select = c("sequence_id", "v_call", "d_call", "j_call"))
+data_genotyped <- fread("${personal_run}", data.table = FALSE, select = c("sequence_id", "v_call", "d_call", "j_call"))
+
+## make sure that both datasets have the same sequences. 
+data_initial_run <- data_initial_run[data_initial_run[["sequence_id"]] %in% data_genotyped[["sequence_id"]],]
+data_genotyped <- data_genotyped[data_genotyped[["sequence_id"]] %in% data_initial_run[["sequence_id"]],]
+data_initial_run <- data_initial_run[order(data_initial_run[["sequence_id"]]), ]
+data_genotyped <- data_genotyped[order(data_genotyped[["sequence_id"]]), ]
+
+non_match_v <- which(data_initial_run[["v_call"]]!=data_genotyped[["v_call"]])
+
+data_initial_run[["v_call"]][non_match_v] <- data_genotyped[["v_call"]][non_match_v]
+    
+
+# for the v_calls
+print("v_call_fractions")
+tab_freq_v <- getFreq(data_genotyped, call = "v_call")
+tab_clone_v <- getFreq(data_initial_run, call = "v_call")
+# keep just alleles that passed the genotype
+tab_clone_v <- tab_clone_v[names(tab_freq_v)]
+# read the genotype table
+genoV <- fread("${v_genotype}", data.table = FALSE, colClasses = "character")
+# add information to the genotype table
+genoV <-
+  genoV %>% dplyr::group_by(gene) %>% dplyr::mutate(
+    Freq_by_Clone = addFreqInfo(tab_clone_v, gene, genotyped_alleles),
+    Freq_by_Seq = addFreqInfo(tab_freq_v, gene, genotyped_alleles)
+  )
+
+
+# for the j_calls
+print("j_call_fractions")
+tab_freq_j <- getFreq(data_genotyped, call = "j_call")
+tab_clone_j <- getFreq(data_initial_run, call = "j_call")
+# keep just alleles that passed the genotype
+tab_clone_j <- tab_clone_j[names(tab_freq_j)]
+# read the genotype table
+genoJ <- fread("${j_genotype}", data.table = FALSE, colClasses = "character")
+# add information to the genotype table
+genoJ <-
+  genoJ %>% dplyr::group_by(gene) %>% dplyr::mutate(
+    Freq_by_Clone = addFreqInfo(tab_clone_j, gene, genotyped_alleles),
+    Freq_by_Seq = addFreqInfo(tab_freq_j, gene, genotyped_alleles)
+  )
+  
+# for the d_calls; first check if the genotype file for d exists
+# if("${d_genotype}"=="*tsv")
+if (endsWith("${d_genotype}", ".tsv")){
+	# for the d_calls
+	print("d_call_fractions")
+	tab_freq_d <- getFreq(data_genotyped, call = "d_call")
+	tab_clone_d <- getFreq(data_initial_run, call = "d_call")
+	# keep just alleles that passed the genotype
+	tab_clone_d <- tab_clone_d[names(tab_freq_d)]
+	# read the genotype table
+	genoD <- fread("${d_genotype}", data.table = FALSE, colClasses = "character")
+	# add information to the genotype table
+	print(tab_clone_d)
+	print(tab_freq_d)
+	print(genoD)
+	genoD <-
+	  genoD %>% dplyr::group_by(gene) %>% dplyr::mutate(
+	    Freq_by_Clone = addFreqInfo(tab_clone_d, gene, genotyped_alleles),
+	    Freq_by_Seq = addFreqInfo(tab_freq_d, gene, genotyped_alleles)
+	  )
+	  
+	genos <- plyr::rbind.fill(genoV, genoD, genoJ)
+}else{
+	genos <- plyr::rbind.fill(genoV, genoJ)
+}
+
+genos[["Freq_by_Clone"]] <- gsub("NA", "0", genos[["Freq_by_Clone"]])
+genos[["Freq_by_Seq"]] <- gsub("NA", "0", genos[["Freq_by_Seq"]])
+
+# rename the genotyped_allele columns
+new_genotyped_allele_name = "GENOTYPED_ALLELES"
+col_loc = which(names(genos)=='genotyped_alleles')
+names(genos)[col_loc] = new_genotyped_allele_name
+
+
+# write the report
+write.table(genos, file = paste0("${outname}","_genotype.tsv"), row.names = F, sep = "\t")
+"""
 }
 
 
