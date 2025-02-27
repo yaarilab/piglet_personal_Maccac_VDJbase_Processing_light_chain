@@ -1,13 +1,13 @@
-# VDJbase repertoire annotation and downstream analysis
+# VDJbase repertoire annotation and downstream analysis for the light chain R24 macaque sequences
 
 
-The pipeline performs anotation and downstrean analysis of AIRR-seq.
+The nextflow pipeline performs anotation and downstrean analysis of AIRR-seq.
 
 The pipeline can be devided into seven main componenet:
 
 **1. Initial repertoire alignment and annotation based reference set**
 
-> In this section, the repertoire sequences are annotated using IgBlast and MakeDb (presto) against the supplied reference set and collapse tham.
+> In this section, the repertoire sequences are annotated using IgBlast and MakeDb (chango) against the supplied reference set and collapse tham.
 
 **2. Undocumented allele inference**
 
@@ -17,17 +17,17 @@ The pipeline can be devided into seven main componenet:
 
 > In this section, in case undocumented alleles were inferred the repertoire is re-aligned and annotated with the additional alleles.
 
-**4. Clonal inference and selection of colonal representative**
+**4. Pre genotype inference**
 
-> In this section, clones are infered for the annotated repertoire, and a single representative for each clone whith the least number of mutation is chosen.
+> In this section, Sequences were required to have no mutations within the V region, a single V allele assignment, and alignment starting at position one of the V germline.
 
 **5. Genotype inference**
 
-> In this section, genotypes are inferred for each of the IG calls: V, D, and J using TIgGER Bayesian inferernce tool, and a personal reference set is created.
+> In this section, genotypes are inferred for each of the IG calls: V, D, and J using TIgGER Bayesian inferernce tool, and a personal genotype reference set is created.
 
 **6. Third repertoire alignment and annotation with the personal reference set.**
 
-> In this section, the repertoire sequences are annotated using IgBlast and MakeDb (presto) against the personal reference set from step 5.
+> In this section, the repertoire sequences are annotated using IgBlast and MakeDb (chango) against the personal genotype reference set from step 5.
 
 **7. OGRDB statistics.**
 
@@ -37,10 +37,12 @@ The pipeline can be devided into seven main componenet:
 ### Input files:
 
 1. An AIRR-seq in fasta format.
-2. heavy_chain (yes/no)
-3. chain - (IGHV/IGLV/IGKV)
-4. Reference set files for IG*V, IG*D, and IG*J alleles in fasta format for the right chain.
-5. auxiliary_data and custom_internal_data for the right chain.
+2. heavy_chain no
+3. chain - (IGLV/IGKV)
+4. ndm_chain - (IGL/IGK)
+5. Personal reference set files for IG\*V, IGHD, and IG*J alleles in fasta format.
+6. Optimized thresholds files for IG\*V, IG*J alleles.
+
 
 ### Output:
 
@@ -61,3 +63,10 @@ The pipeline uses two docker images:
 
 
 
+### How to run the annotation pipeline:
+
+```bash
+nextflow run main.nf --airr_seq {sampleName}.fasta --v_germline_file V_gapped.fasta --d_germline D.fasta --j_germline J.fasta
+--v_optimized_thresholds IGHV_optimized_thresholds.tsv --j_optimized_thresholds IGHJ_optimized_thresholds.tsv 
+--chain IGLV\IGKV --ndm_chain IGL\IGK --heavy_chain yes -w {work_dir} --outdir {out_dir} --sample_name {sampleName} --nproc {nproc} -with-docker -resume
+```

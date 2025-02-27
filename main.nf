@@ -2368,6 +2368,7 @@ write.table(df, sep = "\t", file = paste0("${outname}", ".tsv"), row.names = FAL
 """
 }
 
+g_92_csvFile1_g_113= g_92_csvFile1_g_113.ifEmpty([""]) 
 g_97_outputFileCSV1_g_113= g_97_outputFileCSV1_g_113.ifEmpty([""]) 
 g_90_outputFileCSV1_g_113= g_90_outputFileCSV1_g_113.ifEmpty([""]) 
 
@@ -3708,6 +3709,7 @@ rmarkdown::render("${rmk}", clean=TRUE, output_format="html_document", output_di
 """
 }
 
+g_130_csvFile1_g_134= g_130_csvFile1_g_134.ifEmpty([""]) 
 g_129_outputFileCSV1_g_134= g_129_outputFileCSV1_g_134.ifEmpty([""]) 
 
 
@@ -3720,7 +3722,7 @@ input:
  file j_change from g_129_outputFileCSV1_g_134
 
 output:
- set val(name),file("*_change_name.tsv")  into g_134_outputFileTSV0_g_136, g_134_outputFileTSV0_g_143, g_134_outputFileTSV0_g_145
+ set val(name),file("*_change_name.tsv")  into g_134_outputFileTSV0_g_136, g_134_outputFileTSV0_g_145, g_134_outputFileTSV0_g_143
  set val(name),file("*_to_piglet.tsv")  into g_134_outputFileTSV11
 
 script:
@@ -3813,63 +3815,6 @@ write.table(data_selected, sep = "\t", file = paste0("${outname_selected}", ".ts
 
 }
 
-
-process ogrdbstats_report {
-
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*pdf$/) "ogrdbstats_third_alignment/$filename"}
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*csv$/) "ogrdbstats_third_alignment/$filename"}
-input:
- set val(name),file(airrFile) from g_134_outputFileTSV0_g_145
- set val(name1), file(germline_file) from g131_12_germlineFastaFile1_g_145
- set val(name2), file(v_germline_file) from g_114_germlineFastaFile1_g_145
-
-output:
- file "*pdf"  into g_145_outputFilePdf00
- file "*csv"  into g_145_outputFileCSV11
-
-script:
-
-// general params
-chain = params.ogrdbstats_report.chain
-outname = airrFile.name.toString().substring(0, airrFile.name.toString().indexOf("_db-pass"))
-
-"""
-
-germline_file_path=\$(realpath ${germline_file})
-
-novel=""
-
-if grep -q "_[A-Z][0-9]" ${v_germline_file}; then
-	awk '/^>/{f=0} \$0 ~ /_[A-Z][0-9]/ {f=1} f' ${v_germline_file} > novel_sequences.fasta
-	novel=\$(realpath novel_sequences.fasta)
-	diff \$germline_file_path \$novel | grep '^<' | sed 's/^< //' > personal_germline.fasta
-	germline_file_path=\$(realpath personal_germline.fasta)
-	novel="--inf_file \$novel"
-fi
-
-IFS='\t' read -a var < ${airrFile}
-
-airrfile=${airrFile}
-
-if [[ ! "\${var[*]}" =~ "v_call_genotyped" ]]; then
-    awk -F'\t' '{col=\$5;gsub("call", "call_genotyped", col); print \$0 "\t" col}' ${airrFile} > ${outname}_genotyped.tsv
-    airrfile=${outname}_genotyped.tsv
-fi
-
-airrFile_path=\$(realpath \$airrfile)
-
-
-run_ogrdbstats \
-	\$germline_file_path \
-	"Homosapiens" \
-	\$airrFile_path \
-	${chain} \
-	\$novel 
-
-"""
-
-}
-
 def defaultIfInexistent(varName){
     try{
     	println binding.hasVariable(varName)
@@ -3894,7 +3839,7 @@ def bindingVar(varName) {
 }
 process VDJbase_genotype_report {
 
-publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /${outname}_genotype.tsv$/) "genotype_report/$filename"}
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /${outname}_Final_genotype.tsv$/) "genotype_report/$filename"}
 input:
  set val(name1),file(initial_run) from g_113_outputFileTSV0_g_143
  set val(name2),file(personal_run) from g_134_outputFileTSV0_g_143
@@ -3902,11 +3847,11 @@ input:
  set val(name5),file(j_genotype) from g_115_outputFileTSV0_g_143
 
 output:
- set val(outname),file("${outname}_genotype.tsv") optional true  into g_143_outputFileTSV00
+ set val(outname),file("${outname}_Final_genotype.tsv")  into g_143_outputFileTSV00
 
 script:
 
-outname = initial_run.name.substring(0, initial_run.name.indexOf("_db-pass"))
+outname = initial_run.name.substring(0, initial_run.name.indexOf("_Second_Alignment_db-pass"))
 
 """
 #!/usr/bin/env Rscript
@@ -4008,8 +3953,66 @@ names(genos)[col_loc] = new_genotyped_allele_name
 
 
 # write the report
-write.table(genos, file = paste0("${outname}","_genotype.tsv"), row.names = F, sep = "\t")
+print("Writing Genotype Report")
+write.table(genos, file = paste0("${outname}","_Final_genotype.tsv"), row.names = F, sep = "\t")
 """
+}
+
+
+process ogrdbstats_report {
+
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*pdf$/) "ogrdbstats_third_alignment/$filename"}
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*csv$/) "ogrdbstats_third_alignment/$filename"}
+input:
+ set val(name),file(airrFile) from g_134_outputFileTSV0_g_145
+ set val(name1), file(germline_file) from g131_12_germlineFastaFile1_g_145
+ set val(name2), file(v_germline_file) from g_114_germlineFastaFile1_g_145
+
+output:
+ file "*pdf"  into g_145_outputFilePdf00
+ file "*csv"  into g_145_outputFileCSV11
+
+script:
+
+// general params
+chain = params.ogrdbstats_report.chain
+outname = airrFile.name.toString().substring(0, airrFile.name.toString().indexOf("_db-pass"))
+
+"""
+
+germline_file_path=\$(realpath ${germline_file})
+
+novel=""
+
+if grep -q "_[A-Z][0-9]" ${v_germline_file}; then
+	awk '/^>/{f=0} \$0 ~ /_[A-Z][0-9]/ {f=1} f' ${v_germline_file} > novel_sequences.fasta
+	novel=\$(realpath novel_sequences.fasta)
+	diff \$germline_file_path \$novel | grep '^<' | sed 's/^< //' > personal_germline.fasta
+	germline_file_path=\$(realpath personal_germline.fasta)
+	novel="--inf_file \$novel"
+fi
+
+IFS='\t' read -a var < ${airrFile}
+
+airrfile=${airrFile}
+
+if [[ ! "\${var[*]}" =~ "v_call_genotyped" ]]; then
+    awk -F'\t' '{col=\$5;gsub("call", "call_genotyped", col); print \$0 "\t" col}' ${airrFile} > ${outname}_genotyped.tsv
+    airrfile=${outname}_genotyped.tsv
+fi
+
+airrFile_path=\$(realpath \$airrfile)
+
+
+run_ogrdbstats \
+	\$germline_file_path \
+	"Homosapiens" \
+	\$airrFile_path \
+	${chain} \
+	\$novel 
+
+"""
+
 }
 
 
