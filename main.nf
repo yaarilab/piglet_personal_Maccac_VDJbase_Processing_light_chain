@@ -271,7 +271,7 @@ input:
  set val(name), file(D_ref) from g_3_germlineFastaFile_g_97
 
 output:
- set val("d_ref"), file("new_D_novel_germline*")  into g_97_germlineFastaFile0_g_137, g_97_germlineFastaFile0_g11_16, g_97_germlineFastaFile0_g11_12, g_97_germlineFastaFile0_g0_16, g_97_germlineFastaFile0_g0_12, g_97_germlineFastaFile0_g131_16, g_97_germlineFastaFile0_g131_12
+ set val("d_ref"), file("new_D_novel_germline*")  into g_97_germlineFastaFile0_g_137, g_97_germlineFastaFile0_g_148, g_97_germlineFastaFile0_g11_16, g_97_germlineFastaFile0_g11_12, g_97_germlineFastaFile0_g0_16, g_97_germlineFastaFile0_g0_12, g_97_germlineFastaFile0_g131_16, g_97_germlineFastaFile0_g131_12
  file "*changes.csv" optional true  into g_97_outputFileCSV1_g_113
 
 
@@ -2383,7 +2383,7 @@ input:
 
 output:
  set val(name),file("*_change_name.tsv")  into g_113_outputFileTSV0_g_125, g_113_outputFileTSV0_g_143
- set val(name),file("*_to_piglet.tsv")  into g_113_outputFileTSV1_g_114, g_113_outputFileTSV1_g_115
+ set val(name),file("*_to_piglet.tsv")  into g_113_outputFileTSV1_g_114, g_113_outputFileTSV1_g_115, g_113_outputFileTSV1_g_148
 
 script:
 chain = params.changes_names_for_piglet.chain
@@ -2407,10 +2407,6 @@ sample <- strsplit(basename("${airrFile}"), "[.]")[[1]][1]
 select_columns <- if ("${chain}" == "IGH") c("sequence_id", "v_call", "d_call", "j_call") else c("sequence_id", "v_call", "j_call")
 data <- data.table::fread("${airrFile}", data.table = F)
 
-# Load V change file
-change_file <- "v_changes.csv"
-changes <- read.csv(change_file, header = FALSE, col.names = c("row", "old_id", "new_id"))
-
 # Convert to data.table
 setDT(data)
 
@@ -2421,7 +2417,10 @@ data[, `:=`(
   j_call_changed = j_call
 )]
 
+# Load V change file
+change_file <- "v_changes.csv"
 if (file.exists(change_file)) {
+	changes <- read.csv(change_file, header = FALSE, col.names = c("row", "old_id", "new_id"))
 	# Apply changes to v_call
 	for (change in 1:nrow(changes)) {
 	  old_id <- changes[change, "old_id"]
@@ -3227,6 +3226,31 @@ write.table(merged_data, sep = "\t", file = paste0("${outname}", ".tsv"), row.na
 }
 
 
+process genotype_piglet_d_fake {
+
+input:
+ set val(name), file(ref) from g_97_germlineFastaFile0_g_148
+ set val(name1),file(airrFile) from g_113_outputFileTSV1_g_148
+
+output:
+ set val(name1),file("*_genotype_report.tsv") optional true  into g_148_outputFileTSV00
+ set val(name1),file("*_personal_reference.fasta") optional true  into g_148_germlineFastaFile11
+ set val("fake"),file("fake*") optional true  into g_148_outputFileTSV2_g_143
+
+script:
+
+call = params.genotype_piglet_d_fake.call
+
+
+"""
+#!/usr/bin/env Rscript
+
+"""
+
+
+}
+
+
 process third_Alignment_IgBlastn {
 
 input:
@@ -3747,10 +3771,6 @@ sample <- strsplit(basename("${airrFile}"), "[.]")[[1]][1]
 select_columns <- if ("${chain}" == "IGH") c("sequence_id", "v_call", "d_call", "j_call") else c("sequence_id", "v_call", "j_call")
 data <- data.table::fread("${airrFile}", data.table = F)
 
-# Load V change file
-change_file <- "v_changes.csv"
-changes <- read.csv(change_file, header = FALSE, col.names = c("row", "old_id", "new_id"))
-
 # Convert to data.table
 setDT(data)
 
@@ -3761,7 +3781,10 @@ data[, `:=`(
   j_call_changed = j_call
 )]
 
+# Load V change file
+change_file <- "v_changes.csv"
 if (file.exists(change_file)) {
+	changes <- read.csv(change_file, header = FALSE, col.names = c("row", "old_id", "new_id"))
 	# Apply changes to v_call
 	for (change in 1:nrow(changes)) {
 	  old_id <- changes[change, "old_id"]
@@ -3815,6 +3838,8 @@ write.table(data_selected, sep = "\t", file = paste0("${outname_selected}", ".ts
 
 }
 
+g_148_outputFileTSV2_g_143= g_148_outputFileTSV2_g_143.ifEmpty([""]) 
+
 def defaultIfInexistent(varName){
     try{
     	println binding.hasVariable(varName)
@@ -3844,6 +3869,7 @@ input:
  set val(name1),file(initial_run) from g_113_outputFileTSV0_g_143
  set val(name2),file(personal_run) from g_134_outputFileTSV0_g_143
  set val(name3),file(v_genotype) from g_114_outputFileTSV0_g_143
+ set val(name4),file(d_genotype) from g_148_outputFileTSV2_g_143
  set val(name5),file(j_genotype) from g_115_outputFileTSV0_g_143
 
 output:
