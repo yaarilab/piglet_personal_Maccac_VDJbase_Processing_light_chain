@@ -137,6 +137,9 @@ params.third_Alignment_MakeDb.partial = "false"
 params.third_Alignment_MakeDb.name_alignment = "Finale"
 
 
+// Process Parameters for ogrdbstats_report:
+params.ogrdbstats_report.chain = params.chain
+
 if (!params.v_germline_file){params.v_germline_file = ""} 
 if (!params.d_germline){params.d_germline = ""} 
 if (!params.j_germline){params.j_germline = ""} 
@@ -271,7 +274,7 @@ input:
  set val(name), file(D_ref) from g_3_germlineFastaFile_g_97
 
 output:
- set val("d_ref"), file("new_D_novel_germline*")  into g_97_germlineFastaFile0_g_137, g_97_germlineFastaFile0_g_148, g_97_germlineFastaFile0_g11_16, g_97_germlineFastaFile0_g11_12, g_97_germlineFastaFile0_g0_16, g_97_germlineFastaFile0_g0_12, g_97_germlineFastaFile0_g131_16, g_97_germlineFastaFile0_g131_12
+ set val("d_ref"), file("new_D_novel_germline*")  into g_97_germlineFastaFile0_g_137, g_97_germlineFastaFile0_g_148, g_97_germlineFastaFile0_g_149, g_97_germlineFastaFile0_g11_16, g_97_germlineFastaFile0_g11_12, g_97_germlineFastaFile0_g0_16, g_97_germlineFastaFile0_g0_12, g_97_germlineFastaFile0_g131_16, g_97_germlineFastaFile0_g131_12
  file "*changes.csv" optional true  into g_97_outputFileCSV1_g_113
 
 
@@ -2487,7 +2490,7 @@ input:
 
 output:
  set val(name1),file("*_genotype_report.tsv")  into g_115_outputFileTSV0_g_143
- set val(name1),file("*_personal_reference.fasta")  into g_115_germlineFastaFile1_g_129
+ set val(name1),file("*_personal_reference.fasta")  into g_115_germlineFastaFile1_g_129, g_115_germlineFastaFile1_g_149
 
 script:
 call = params.genotype_piglet_j_call.call
@@ -2836,7 +2839,7 @@ input:
 
 output:
  set val(name1),file("*_genotype_report.tsv")  into g_114_outputFileTSV0_g_143
- set val(name1),file("*_personal_reference.fasta")  into g_114_germlineFastaFile1_g_130, g_114_germlineFastaFile1_g_145
+ set val(name1),file("*_personal_reference.fasta")  into g_114_germlineFastaFile1_g_130, g_114_germlineFastaFile1_g_145, g_114_germlineFastaFile1_g_149
 
 script:
 call = params.genotype_piglet_v_call.call
@@ -3014,6 +3017,29 @@ for (i in 1:nrow(genotypes)) {
 }
 
 writeFasta(germline_db_new, file = paste0("${call}","_personal_reference.fasta"))
+"""
+
+}
+
+
+process creat_ref_set {
+
+input:
+ set val(name1), file(v_germline_file) from g_114_germlineFastaFile1_g_149
+ set val(name2), file(d_germline_file) from g_97_germlineFastaFile0_g_149
+ set val(name3), file(j_germline_file) from g_115_germlineFastaFile1_g_149
+
+output:
+ set val("reference_set"), file("${reference_set}")  into g_149_germlineFastaFile0_g_145
+
+script:
+
+
+reference_set = "reference_set_makedb.fasta"
+
+"""
+	cat ${v_germline_file} ${d_germline_file} ${j_germline_file} > ${reference_set}
+
 """
 
 }
@@ -3311,7 +3337,7 @@ input:
 
 output:
  set val(name_igblast),file("*_db-pass.tsv") optional true  into g131_12_outputFileTSV0_g131_43, g131_12_outputFileTSV0_g131_47, g131_12_outputFileTSV0_g_134
- set val("reference_set"), file("${reference_set}") optional true  into g131_12_germlineFastaFile1_g_145
+ set val("reference_set"), file("${reference_set}") optional true  into g131_12_germlineFastaFile11
  set val(name_igblast),file("*_db-fail.tsv") optional true  into g131_12_outputFileTSV22
 
 script:
@@ -3991,7 +4017,7 @@ publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*
 publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*csv$/) "ogrdbstats_third_alignment/$filename"}
 input:
  set val(name),file(airrFile) from g_134_outputFileTSV0_g_145
- set val(name1), file(germline_file) from g131_12_germlineFastaFile1_g_145
+ set val(name1), file(germline_file) from g_149_germlineFastaFile0_g_145
  set val(name2), file(v_germline_file) from g_114_germlineFastaFile1_g_145
 
 output:
