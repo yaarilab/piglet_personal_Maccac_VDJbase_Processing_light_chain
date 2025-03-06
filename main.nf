@@ -2839,7 +2839,7 @@ input:
 
 output:
  set val(name1),file("*_genotype_report.tsv")  into g_114_outputFileTSV0_g_143
- set val(name1),file("*_personal_reference.fasta")  into g_114_germlineFastaFile1_g_130, g_114_germlineFastaFile1_g_145, g_114_germlineFastaFile1_g_149
+ set val(name1),file("*_personal_reference.fasta")  into g_114_germlineFastaFile1_g_145, g_114_germlineFastaFile1_g_149, g_114_germlineFastaFile1_g_130
 
 script:
 call = params.genotype_piglet_v_call.call
@@ -3022,29 +3022,6 @@ writeFasta(germline_db_new, file = paste0("${call}","_personal_reference.fasta")
 }
 
 
-process creat_ref_set {
-
-input:
- set val(name1), file(v_germline_file) from g_114_germlineFastaFile1_g_149
- set val(name2), file(d_germline_file) from g_97_germlineFastaFile0_g_149
- set val(name3), file(j_germline_file) from g_115_germlineFastaFile1_g_149
-
-output:
- set val("reference_set"), file("${reference_set}")  into g_149_germlineFastaFile0_g_145
-
-script:
-
-
-reference_set = "reference_set_makedb.fasta"
-
-"""
-	cat ${v_germline_file} ${d_germline_file} ${j_germline_file} > ${reference_set}
-
-"""
-
-}
-
-
 process change_novel_to_not_1 {
 
 input:
@@ -3085,7 +3062,7 @@ def fasta_to_dataframe(file_path):
 file_path = '${readArray_v_ref}'  # Replace with the actual path
 df = fasta_to_dataframe(file_path)
 
-index_counter = 30  # Start index
+index_counter = 40  # Start index
 
 for index, row in df.iterrows():
     if '_' in row['ID']:
@@ -3195,6 +3172,29 @@ ndm_file = db_name+".ndm"
 
 """
 make_igblast_ndm ${germlineFile} ${chain} ${ndm_file}
+"""
+
+}
+
+
+process creat_ref_set {
+
+input:
+ set val(name1), file(v_germline_file) from g_114_germlineFastaFile1_g_149
+ set val(name2), file(d_germline_file) from g_97_germlineFastaFile0_g_149
+ set val(name3), file(j_germline_file) from g_115_germlineFastaFile1_g_149
+
+output:
+ set val("reference_set"), file("${reference_set}")  into g_149_germlineFastaFile0_g_145
+
+script:
+
+
+reference_set = "reference_set_makedb.fasta"
+
+"""
+	cat ${v_germline_file} ${d_germline_file} ${j_germline_file} > ${reference_set}
+
 """
 
 }
