@@ -2378,6 +2378,7 @@ g_90_outputFileCSV1_g_113= g_90_outputFileCSV1_g_113.ifEmpty([""])
 
 process changes_names_for_piglet {
 
+publishDir params.outdir, mode: 'copy', saveAs: {filename -> if (filename =~ /.*_change_name.tsv$/) "rearrangements/$filename"}
 input:
  set val(name),file(airrFile) from g_83_outputFileTSV0_g_113
  file v_change from g_92_csvFile1_g_113
