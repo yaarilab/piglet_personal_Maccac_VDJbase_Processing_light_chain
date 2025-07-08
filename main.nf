@@ -2527,7 +2527,12 @@ germ <- merge(germline, novel_germline, by = "sequence", all = TRUE)
 digger_germline <- readDNAStringSet("${ref}")
 digger_germline <- data.table(allele = names(digger_germline), sequence = as.character(digger_germline))
 
-germ <- merge(germ, digger_germline, by = "sequence", all = TRUE)
+#germ <- merge(germ, digger_germline, by = "sequence", all = TRUE)
+
+digger_germline_unique <- unique(digger_germline, by = "sequence")
+germ_unique <- unique(germ, by = "sequence")
+
+germ <- merge(germ_unique, digger_germline_unique, by = "sequence", all = TRUE)
 
 hashed_allele <- germ[allele.x != allele_hashed,]
 hashed_allele <- setNames(hashed_allele[["allele.x"]], hashed_allele[["allele_hashed"]])
@@ -2876,7 +2881,12 @@ germ <- merge(germline, novel_germline, by = "sequence", all = TRUE)
 digger_germline <- readDNAStringSet("${ref}")
 digger_germline <- data.table(allele = names(digger_germline), sequence = as.character(digger_germline))
 
-germ <- merge(germ, digger_germline, by = "sequence", all = TRUE)
+#germ <- merge(germ, digger_germline, by = "sequence", all = TRUE)
+
+digger_germline_unique <- unique(digger_germline, by = "sequence")
+germ_unique <- unique(germ, by = "sequence")
+
+germ <- merge(germ_unique, digger_germline_unique, by = "sequence", all = TRUE)
 
 hashed_allele <- germ[allele.x != allele_hashed,]
 hashed_allele <- setNames(hashed_allele[["allele.x"]], hashed_allele[["allele_hashed"]])
